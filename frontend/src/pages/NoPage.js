@@ -9,7 +9,7 @@ function NoPage() {
         <p>We are sorry that you encountered a page that is not found.<br/> 
             Please visit our home page to learn more about our scouting system. <br/>
             <br/>
-            <iframe src="https://giphy.com/embed/S5ZNQ7ZbeDVokzQwa0" width="480" height="269" class="giphy-embed" allowFullScreen></iframe>
+            <iframe src="https://giphy.com/embed/S5ZNQ7ZbeDVokzQwa0" class="giphy-embed" allowFullScreen></iframe>
         </p>
         
         

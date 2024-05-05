@@ -16,7 +16,7 @@ const Layout = () => {
                         <Nav>
                             <Nav.Link href="/">Home</Nav.Link>
                             <NavDropdown title="Scouting" id="basic-nav-dropdown">
-                                <NavDropdown.Item href="/Pit/Scouting">Pit</NavDropdown.Item>
+                                <NavDropdown.Item href="/Pit">Pit</NavDropdown.Item>
                                 <NavDropdown.Item href="/Match/Scouting">Match</NavDropdown.Item>
                             </NavDropdown>
 
