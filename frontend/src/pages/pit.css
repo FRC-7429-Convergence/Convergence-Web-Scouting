@@ -1,0 +1,23 @@
+.title {
+    margin-top: 2%;
+    text-align: center;
+}
+
+.inputs {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: fit-content;
+    margin-top: 1.5%;
+}
+
+.btn-success {
+    margin-top: 10px;
+    height: auto;
+    width: 15%;
+}
+
+.submit {
+    justify-content: center;
+    text-align: center;
+}
