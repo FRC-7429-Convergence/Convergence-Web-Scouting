@@ -18,9 +18,7 @@ The React server is development server that comes with a create-react-app and is
 ### Comming Soon!
 - Match Scouting System
 - Pit Scouting System
-- Blogging System
 - Detailed Scouting Results Page
-- More Details About Our Team
 
 ## Want to Help?
 Contact Ethen Brandenburg at: ebot14rocks@gmail.com or use the Pull Requests
