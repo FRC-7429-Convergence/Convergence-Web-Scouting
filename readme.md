@@ -1,6 +1,6 @@
-# Isotope Robotics Webportal
+# Isotope Robotics Scouting System
 
-FRC Team 9709 and Management Portal
+FRC Team 9709 Scouting System
 
 # Under The Hood:
 The project is ran on two different "servers", the react dev server and the express API server. Each server is coded in Javascript using two different types
