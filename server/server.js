@@ -1,8 +1,8 @@
 import express, { response } from 'express';
 import mysql from 'mysql2';
 import cors from 'cors';
-import jwt, { verify } from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import session from 'express-session';
@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(cookieParser('jwtSecretKey'));
 
 app.use(cors({
-    origin: ["http://localhost:3000", "http://scouting.isotoperobotics.org", "https://scouting.isotoperobotics.org"],
+    origin: ["http://localhost:3000", "http://team.convergence7429.com", "https://team.convergence7429.com"],
     credentials: true,
 }));
 
@@ -78,11 +78,12 @@ app.get("/api/token", function (req, res, next) {
         //console.log(`Is User Verified: ${verified.name}`);
         name = verified.name;
         let isAdmin = verified.isAdmin;
+        let isKiosk = verified.isKiosk;
         //console.log(`is Users: ${isAdmin}`);
 
         //Add admin handling code for event publishing and user registration
 
-        return res.json({ Status: "Success", user: name, admin: isAdmin });
+        return res.json({ Status: "Success", user: name, admin: isAdmin, kiosk: isKiosk });
     } catch (err) {
         console.log(err);
         console.log(`Is User Verified: False`);
@@ -93,7 +94,7 @@ app.get("/api/token", function (req, res, next) {
 
 //Registers new users into the API
 app.post('/api/auth/register', function (req, res) {
-    const sql = "INSERT INTO users (`name`, `email`, `password`, `signInCode`) VALUES (?)";
+    const sql = "INSERT INTO users (`name`, `email`, `password`, `signInCode`, `express_code`) VALUES (?)";
     bcrypt.hash(req.body.password.toString(), salt, (err, hash) => {
         if (err) return res.json({ Error: "Error for Hashing Password" });
 
@@ -102,6 +103,7 @@ app.post('/api/auth/register', function (req, res) {
             req.body.email,
             hash,
             req.body.signInCode,
+            req.body.express_code
         ]
 
         try {
@@ -199,7 +201,52 @@ app.post('/api/hours/signout', function (req, res) {
     if (req.body.user == "") {
         return res.json({ Status: "Failure" });
     } else {
-        return res.json({ Status: "Success" });
+        let date_obj = new Date();
+        let month = date_obj.getMonth();
+        let day = date_obj.getDate();
+        let year = date_obj.getFullYear();
+        let hour = date_obj.getHours();
+        let min = date_obj.getMinutes();
+
+        let current_time = hour + ":" + min;
+        let current_date = month + "-" + day + "-" + year;
+        let pull_hours_sql = `SELECT * FROM timesheet where date=? AND name=?`;
+
+        try {
+            db.query(pull_hours_sql, [current_date, req.body.user], (err, data) => {
+                if (err) return res.json({ Status: "No Hours For Today" })
+                //If there are hours for the specific day, then we can sign out
+                if (data) {
+                    let sql_update = `UPDATE timesheet SET finishtime=? WHERE name=? AND date=?`;
+                    db.query(sql_update, [current_time, req.body.user, current_date], (err, data) => {
+                        if (err) return res.json({ Status: "Failure" })
+                        else {
+                            res.json({ Status: "Success" });
+                        }
+                    })
+                }
+            })
+        } catch (e) {
+            return res.json({ Status: "Failure" });
+        }
+    }
+})
+
+//Pulls all the entries from the timesheet
+app.get('/api/hours/getAllHours', function (req, res) {
+    let sql = `SELECT * FROM timesheet`
+    try {
+        db.query(sql, (err, data) => {
+            if (err) return res.json({ Status: "Failure" })
+            if (data) {
+                console.log(data);
+                return res.json({ Status: "Success", results: data });
+            } else {
+                return res.json({ Status: "Failure" })
+            }
+        })
+    } catch (e) {
+        return res.json({ Status: "Failure" })
     }
 })
 
@@ -211,7 +258,7 @@ app.get('/api/auth/logout', function (req, res) {
     return res.json({ Status: "Success" });
 })
 
-//Handles login form form the API
+//Handles login from the API
 app.post('/api/auth/login', function (req, res) {
     const sql = "SELECT * FROM users WHERE email = ?";
     try {
@@ -223,7 +270,8 @@ app.post('/api/auth/login', function (req, res) {
                     if (response) {
                         const name = data[0].name;
                         const isAdmin = checkIsAdmin(data[0].signInCode);
-                        const token = jwt.sign({ name, isAdmin }, process.env.PASS_KEY, { expiresIn: '365d' });
+                        const isKiosk = checkIsKiosk(data[0].signInCode);
+                        const token = jwt.sign({ name, isAdmin, isKiosk }, process.env.PASS_KEY, { expiresIn: '365d' });
                         req.session.token = token;
                         return res.json({ Status: "Success", token });
                     } else {
@@ -232,6 +280,28 @@ app.post('/api/auth/login', function (req, res) {
                 });
             } else {
                 return res.json({ Error: "No User In Database" });
+            }
+        })
+    } catch (e) {
+        return res.json({ Status: "Failure" });
+    }
+})
+
+//Handles login via express code
+app.post('/api/auth/express', function (req, res) {
+    const sql = "SELECT * FROM users where express_code = ?";
+    try {
+        db.query(sql, [req.body.code], (err, data) => {
+            if (err) return res.json({ Error: "Error Finding User" });
+            if (data.length > 0) {
+                const name = data[0].name;
+                const isAdmin = checkIsAdmin(data[0].signInCode);
+                const isKiosk = checkIsKiosk(data[0].signInCode);
+                const token = jwt.sign({ name, isAdmin, isKiosk }, process.env.PASS_KEY, { expiresIn: '365d' });
+                req.session.token = token;
+                return res.json({ Status: "Success", token });
+            } else {
+                return res.json({ Error: "Express Code Not Valid" });
             }
         })
     } catch (e) {
@@ -354,6 +424,29 @@ app.get('/api/event/:code', function (req, res) {
     return req.json({ Status: "Success", key: event_key });
 })
 
+//Returns stats about a specific team
+app.get('/api/teams/stats/:event/:team', function (req, res) {
+    const currentYear = new Date().getFullYear();
+    const get_info_sql = `SELECT * FROM ${currentYear}${req.params.event}match WHERE TeamNumber = ${req.params.team}`;
+
+    try {
+        db.query(get_info_sql, (err, result) => {
+            if (err) return res.json({ Status: `Error Retrieving Match Data For Team:${req.params.team} ` });
+            else {
+                if (result.length > 0) {
+                    return res.json({ Status: "Success", stats: result });
+                }
+                else {
+                    return res.json({ Status: "Error" });
+                }
+            }
+        })
+    }
+    catch (e) {
+        return res.json({ Status: "Error" });
+    }
+})
+
 //Adds a new event to the database after pulling info from TBA
 app.post('/api/events/add', function (req, res) {
     try {
@@ -400,11 +493,11 @@ app.post('/api/event/pit/submit', function (req, res) {
         Drivetrain,
         Drivetrain_Motors,
         FreeSpeed,
+        Start_Position,
         Element_Pickup,
         Element_Scoring,
-        Hang_Charge,
-        Start_Position,
-        Auto_Balance) VALUES (?)`;
+        OnStage,
+        Trap) VALUES (?)`;
 
     const values = [
         req.body.number,
@@ -415,11 +508,11 @@ app.post('/api/event/pit/submit', function (req, res) {
         req.body.driveTrain,
         req.body.motors,
         req.body.freeSpeed,
-        req.body.elementPickup,
-        req.body.elementScoring,
-        req.body.hangChargestation,
-        req.body.startPosition,
-        req.body.autoBalance
+        req.body.start_Position,
+        req.body.element_Pickup,
+        req.body.element_Scoring,
+        req.body.onStage,
+        req.body.trap
     ]
     try {
 
@@ -435,11 +528,11 @@ app.post('/api/event/pit/submit', function (req, res) {
                 Drivetrain varchar(255),
                 Drivetrain_Motors varchar(255),
                 FreeSpeed varchar(255),
+                Start_Position varchar(255),
                 Element_Pickup varchar(255),
                 Element_Scoring varchar(255),
-                Hang_Charge varchar(255),
-                Start_Position varchar(255),
-                Auto_Balance varchar(255))`;
+                OnStage varchar(255),
+                Trap varchar(255))`;
 
                 db.query(table_sql, (err, result) => {
                     if (err) return res.json({ Error: err });
@@ -467,57 +560,60 @@ app.post('/api/event/match/submit', function (req, res) {
     const new_event = removeSpaces(sql_event);
 
     const sql = `INSERT INTO ${new_event}match (
-        TeamNumber,
-        MatchNum,
-        Placement,
-        Mobility,
-        AutoBalance,
-        ConeHigh,
-        ConeLow,
-        CubeScore,
-        AutoScore,
-        TeleConeHigh,
-        TeleConeLow,
-        TeleCube,
-        TeleScore,
-        TeleBalance
+                TeamNumber,
+                MatchNum,
+                Placement,
+                Mobility,
+                AutoAmpNote,
+                AutoSpeakerNote,
+                AmpNote,
+                SpeakerNote,
+                AmpedSpeakerNote,
+                Park,
+                OnStage,
+                Spotlit,
+                Harmony,
+                TrapNote, 
+                WinLossTie           
     ) VALUES (?)`;
 
     const values = [
         req.body.teamNumber,
-        req.body.matchNumber,
+        req.body.matchNum,
         req.body.placement,
         req.body.mobility,
-        req.body.autoBalance,
-        req.body.coneHigh,
-        req.body.coneLow,
-        req.body.cubeScore,
-        req.body.autoScore,
-        req.body.teleConeHigh,
-        req.body.teleConeLow,
-        req.body.teleCube,
-        req.body.teleScore,
-        req.body.teleBalance
+        req.body.autoAmpNote,
+        req.body.autoSpeakerNote,
+        req.body.ampNote,
+        req.body.speakerNote,
+        req.body.ampedSpeakerNote,
+        req.body.park,
+        req.body.onStage,
+        req.body.spotlit,
+        req.body.harmony,
+        req.body.trapNote, 
+        req.body.winLossTie
     ]
 
     try {
         db.query(sql, [values], (err, result) => {
             if (err) {
                 const table_sql = `CREATE TABLE ${new_event}match (
-                TeamNumber varchar(255),
-                MatchNum varchar(255),
-                Placement varchar(255),
-                Mobility varchar(255),
-                AutoBalance varchar(255),
-                ConeHigh varchar(255),
-                ConeLow varchar(255),
-                CubeScore varchar(255),
-                AutoScore varchar(255),
-                TeleConeHigh varchar(255),
-                TeleConeLow varchar(255),
-                TeleCube varchar(255),
-                TeleScore varchar(255),
-                TeleBalance varchar(255)
+                    TeamNumber varchar(255),
+                    MatchNum varchar(255),
+                    Placement varchar(255),
+                    Mobility varchar(255),
+                    AutoAmpNote varchar(255),
+                    AutoSpeakerNote varchar(255),
+                    AmpNote varchar(255),
+                    SpeakerNote varchar(255),
+                    AmpedSpeakerNote varchar(255),
+                    Park varchar(255),
+                    OnStage varchar(255),
+                    Spotlit varchar(255),
+                    Harmony varchar(255),
+                    TrapNote varchar(255), 
+                    WinLossTie varchar(255)             
                 )`;
                 db.query(table_sql, [values], (err, result) => {
                     if (err) return res.json({ Status: err });
@@ -557,11 +653,14 @@ app.post("*", function (req, res) {
     return res.json({ Status: "404 Resource Not Found" })
 })
 
+//NO ENDPOINTS BELOW THIS POINT!!
+
 //Starts the API Server
 app.listen(8081, () => {
     console.log("API Server Running on port: 8081")
 })
 
+//FUNCTIONS FOR ENDPOINTS BELOW HERE!!
 
 //Pulls teams and puts them in database
 function getTeamsByEvent(eventKey, year) {
@@ -663,4 +762,17 @@ function checkIsAdmin(signInCode) {
     }
 
     return isAdmin;
+}
+
+function checkIsKiosk(signInCode) {
+    let isKiosk = "false";
+    if (signInCode == "student") {
+        isKiosk = "false";
+    } else if (signInCode == "kiosk") {
+        isKiosk = "true";
+    } else {
+        isKiosk = "false";
+    }
+
+    return isKiosk;
 }

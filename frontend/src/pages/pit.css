@@ -3,6 +3,10 @@
     text-align: center;
 }
 
+.eventSelect {
+    justify-content: center;
+}
+
 .inputs {
     display: block;
     margin-left: auto;

@@ -6,13 +6,15 @@ import Layout from './pages/Layout';
 import Home from './pages/Home';
 import NoPage from './pages/NoPage';
 import Pit from './pages/Pit';
+import Login from './pages/Login';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
+          <Route index element={<Login />} />
+          <Route path="/home" element={<Home/>}/>
           <Route path="*" element={<NoPage />} />
           <Route path="/Pit" element={<Pit/>}/>
         </Route>
@@ -23,4 +25,4 @@ export default function App() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
-
+ 

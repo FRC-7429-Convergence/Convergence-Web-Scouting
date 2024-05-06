@@ -3,7 +3,7 @@ import './nopage.css';
 
 function NoPage() {
   return (
-    <>
+    <div>
         <h1>***Error - 404***</h1>
 
         <p>We are sorry that you encountered a page that is not found.<br/> 
@@ -13,7 +13,7 @@ function NoPage() {
         </p>
         
         
-  </>
+  </div>
   )
 }
 

@@ -1,6 +1,5 @@
 h1 {
     text-align: center;
-    color: red;
 }
 
 p {
@@ -15,7 +14,6 @@ iframe {
 @media  screen and (max-width:960px) {
     h1 {
         text-align: center;
-        color: red;
     }
     
     p {
